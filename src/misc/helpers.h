@@ -360,12 +360,34 @@ static inline CFArrayRef cfarray_of_cfnumbers(void *values, size_t size, int cou
 
 static inline char *ts_cfstring_copy(CFStringRef string)
 {
-    CFIndex num_bytes = CFStringGetMaximumSizeForEncoding(CFStringGetLength(string), kCFStringEncodingUTF8);
+    CFIndex length = CFStringGetLength(string);
+    CFIndex num_bytes = CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8);
     char *result = ts_alloc_unaligned(num_bytes + 1);
 
-    if (!CFStringGetCString(string, result, num_bytes + 1, kCFStringEncodingUTF8)) {
-        result = NULL;
+    if (CFStringGetCString(string, result, num_bytes + 1, kCFStringEncodingUTF8)) {
+        return result;
     }
+
+    //
+    // NOTE: Conversion fails on an unpaired UTF-16 surrogate, which applications can put in a
+    // window title. Callers expect a string, so substitute U+FFFD for those and convert again.
+    //
+
+    UniChar *chars = malloc(sizeof(UniChar) * length);
+    CFStringGetCharacters(string, CFRangeMake(0, length), chars);
+
+    for (CFIndex i = 0; i < length; ++i) {
+        if (CFStringIsSurrogateHighCharacter(chars[i]) && i+1 < length && CFStringIsSurrogateLowCharacter(chars[i+1])) {
+            ++i;
+        } else if (CFStringIsSurrogateHighCharacter(chars[i]) || CFStringIsSurrogateLowCharacter(chars[i])) {
+            chars[i] = 0xFFFD;
+        }
+    }
+
+    CFStringRef valid = CFStringCreateWithCharactersNoCopy(NULL, chars, length, kCFAllocatorNull);
+    if (!valid || !CFStringGetCString(valid, result, num_bytes + 1, kCFStringEncodingUTF8)) *result = '\0';
+    if (valid) CFRelease(valid);
+    free(chars);
 
     return result;
 }
