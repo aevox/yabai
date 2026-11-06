@@ -16,7 +16,9 @@ volatile uint64_t __last_cmd_tab_time;
 static void update_window_notifications(void)
 {
     int window_count = 0;
-    uint32_t window_list[1024] = {0};
+    int capacity = g_window_manager.window.count + g_window_manager.insert_feedback.count;
+    uint32_t *window_list = malloc(sizeof(uint32_t) * (capacity + 1));
+    if (!window_list) return;
 
     if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
         // NOTE(asmvik): Subscribe to all windows because of window_destroyed (and ordered) notifications
@@ -31,6 +33,7 @@ static void update_window_notifications(void)
     }
 
     SLSRequestNotificationsForWindows(g_connection, window_list, window_count);
+    free(window_list);
 }
 
 static void window_did_receive_focus(struct window_manager *wm, struct mouse_state *ms, struct window *window)
