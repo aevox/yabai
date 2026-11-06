@@ -508,7 +508,9 @@ void window_serialize(FILE *rsp, struct window *window, uint64_t flags)
         if (did_output) fprintf(rsp, ",\n");
 
         char *role = window_role_ts(window);
-        fprintf(rsp, "\t\"role\":\"%s\"", role);
+        char *escaped_role = ts_string_escape(role);
+
+        fprintf(rsp, "\t\"role\":\"%s\"", escaped_role ? escaped_role : role);
         did_output = true;
     }
 
@@ -516,7 +518,9 @@ void window_serialize(FILE *rsp, struct window *window, uint64_t flags)
         if (did_output) fprintf(rsp, ",\n");
 
         char *subrole = window_subrole_ts(window);
-        fprintf(rsp, "\t\"subrole\":\"%s\"", subrole);
+        char *escaped_subrole = ts_string_escape(subrole);
+
+        fprintf(rsp, "\t\"subrole\":\"%s\"", escaped_subrole ? escaped_subrole : subrole);
         did_output = true;
     }
 
