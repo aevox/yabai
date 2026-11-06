@@ -123,16 +123,16 @@ static void scripting_addition_prepare_binaries(void)
 {
     char cmd[MAXLEN];
 
-    snprintf(cmd, sizeof(cmd), "%s %s", "chmod +x", osax_bin_loader);
+    snprintf(cmd, sizeof(cmd), "%s %s", "/bin/chmod +x", osax_bin_loader);
     system(cmd);
 
-    snprintf(cmd, sizeof(cmd), "%s %s %s", "codesign -f -s -", osax_bin_loader, "2>/dev/null");
+    snprintf(cmd, sizeof(cmd), "%s %s %s", "/usr/bin/codesign -f -s -", osax_bin_loader, "2>/dev/null");
     system(cmd);
 
-    snprintf(cmd, sizeof(cmd), "%s %s", "chmod +x", osax_bin_payload);
+    snprintf(cmd, sizeof(cmd), "%s %s", "/bin/chmod +x", osax_bin_payload);
     system(cmd);
 
-    snprintf(cmd, sizeof(cmd), "%s %s %s", "codesign -f -s -", osax_bin_payload, "2>/dev/null");
+    snprintf(cmd, sizeof(cmd), "%s %s %s", "/usr/bin/codesign -f -s -", osax_bin_payload, "2>/dev/null");
     system(cmd);
 }
 
@@ -193,7 +193,7 @@ static int scripting_addition_check(void)
 static bool scripting_addition_remove(void)
 {
     char cmd[MAXLEN];
-    snprintf(cmd, sizeof(cmd), "%s %s %s", "rm -rf", osax_base_dir, "2>/dev/null");
+    snprintf(cmd, sizeof(cmd), "%s %s %s", "/bin/rm -rf", osax_base_dir, "2>/dev/null");
 
     int code = system(cmd);
     return code == 0;
