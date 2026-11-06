@@ -1742,6 +1742,10 @@ bool window_manager_add_existing_application_windows(struct space_manager *sm, s
 
     if (window_list_ref) CFRelease(window_list_ref);
 
+    if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
+        update_window_notifications();
+    }
+
     return result;
 }
 
