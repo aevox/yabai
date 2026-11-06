@@ -1026,6 +1026,37 @@ static EVENT_HANDLER(SPACE_CHANGED)
             window_node_flush(view->root);
             view_clear_flag(view, VIEW_IS_DIRTY);
         }
+
+        //
+        // NOTE: Switching spaces through the scripting addition does not activate an application on the
+        // new space, so the previous front application stays active with none of its windows in sight.
+        // Activating it again then sends no front-switched event, and we never follow it to its space.
+        // Focus the top window of the new space, or Finder when it is empty, like a native switch does.
+        //
+
+        struct application *front_application = window_manager_focused_application(&g_window_manager);
+        if (front_application) {
+            bool has_visible_window = false;
+            int window_count = 0;
+            struct window **window_list = window_manager_find_application_windows(&g_window_manager, front_application, &window_count);
+
+            for (int i = 0; i < window_count; ++i) {
+                struct window *window = window_list[i];
+                if (window_check_flag(window, WINDOW_STICKY) || window_is_sticky(window->id) || space_is_visible(window_space(window->id))) {
+                    has_visible_window = true;
+                    break;
+                }
+            }
+
+            if (!has_visible_window) {
+                struct window *top_window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, g_space_manager.current_space_id, 1, 0);
+                if (top_window) {
+                    window_manager_focus_window_with_raise(&top_window->application->psn, top_window->id, top_window->ref);
+                } else if (!psn_equals(&front_application->psn, &g_process_manager.finder_psn)) {
+                    _SLPSSetFrontProcessWithOptions(&g_process_manager.finder_psn, 0, kCPSNoWindows);
+                }
+            }
+        }
     }
 
     event_signal_push(SIGNAL_SPACE_CHANGED, NULL);
