@@ -41,6 +41,17 @@
 #define unpack(v) memcpy(&v, message, sizeof(v)); message += sizeof(v)
 #define lerp(a, t, b) (((1.0-t)*a) + (t*b))
 
+static char *message_end;
+
+// Counts come from the client: never read more items than the bytes it sent hold.
+static inline int bounded_count(char *message, int count, size_t item_size)
+{
+    if (count <= 0 || message >= message_end) return 0;
+
+    size_t available = (size_t)(message_end - message) / item_size;
+    return (size_t) count < available ? count : (int) available;
+}
+
 extern int SLSMainConnectionID(void);
 extern CGError SLSGetConnectionPSN(int cid, ProcessSerialNumber *psn);
 extern CGError SLSGetWindowAlpha(int cid, uint32_t wid, float *alpha);
@@ -963,6 +974,7 @@ static void do_window_swap_proxy_in(char *message)
 {
     int count = 0;
     unpack(count);
+    count = bounded_count(message, count, 2 * sizeof(uint32_t));
     if (!count) return;
 
     CFTypeRef transaction = SLSTransactionCreate(SLSMainConnectionID());
@@ -985,6 +997,7 @@ static void do_window_swap_proxy_out(char *message)
 {
     int count = 0;
     unpack(count);
+    count = bounded_count(message, count, 2 * sizeof(uint32_t));
     if (!count) return;
 
     CFTypeRef transaction = SLSTransactionCreate(SLSMainConnectionID());
@@ -1022,6 +1035,7 @@ static void do_window_order_in(char *message)
 {
     int count = 0;
     unpack(count);
+    count = bounded_count(message, count, sizeof(uint32_t));
     if (!count) return;
 
     CFTypeRef transaction = SLSTransactionCreate(SLSMainConnectionID());
@@ -1060,6 +1074,8 @@ static void do_window_list_move_to_space(char *message)
 
     int count = 0;
     unpack(count);
+    count = bounded_count(message, count, sizeof(uint32_t));
+    if (!count) return;
 
     CFArrayRef window_list_ref = cfarray_of_cfnumbers((uint32_t*)message, sizeof(uint32_t), count, kCFNumberSInt32Type);
     SLSMoveWindowsToManagedSpace(SLSMainConnectionID(), window_list_ref, sid);
@@ -1104,8 +1120,9 @@ static void do_handshake(int sockfd)
     send(sockfd, bytes, bytes_length+1, 0);
 }
 
-static void handle_message(int sockfd, char *message)
+static void handle_message(int sockfd, char *message, int length)
 {
+    message_end = message + length;
     enum sa_opcode op = *message++;
     switch (op) {
     case SA_OPCODE_HANDSHAKE: {
@@ -1168,7 +1185,7 @@ static void handle_message(int sockfd, char *message)
     }
 }
 
-static inline bool read_message(int sockfd, char *message)
+static inline bool read_message(int sockfd, char *message, int *length)
 {
     int bytes_read    = 0;
     int bytes_to_read = 0;
@@ -1184,6 +1201,7 @@ static inline bool read_message(int sockfd, char *message)
             bytes_read += cur_read;
         } while (bytes_read < bytes_to_read);
 
+        *length = bytes_read;
         return bytes_read == bytes_to_read;
     }
 
@@ -1196,9 +1214,10 @@ static void *handle_connection(void *unused)
         int sockfd = accept(daemon_sockfd, NULL, 0);
         if (sockfd == -1) continue;
 
+        int length = 0;
         char message[SA_SOCKET_BUFF_LEN];
-        if (read_message(sockfd, message)) {
-            handle_message(sockfd, message);
+        if (read_message(sockfd, message, &length)) {
+            handle_message(sockfd, message, length);
         }
 
         shutdown(sockfd, SHUT_RDWR);
